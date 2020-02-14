@@ -5,7 +5,6 @@
 package wgengine
 
 import (
-	"github.com/tailscale/wireguard-go/device"
 	"github.com/tailscale/wireguard-go/tun"
 	"tailscale.com/types/logger"
 )
@@ -14,11 +13,12 @@ type darwinRouter struct {
 	tunname string
 }
 
-func NewUserspaceRouter(logf logger.Logf, tunname string, dev *device.Device, tuntap tun.Device, netChanged func()) Router {
-	r := darwinRouter{
-		tunname: tunname,
+func newUserspaceRouter(logf logger.Logf, tundev tun.Device, netChanged func()) (Router, error) {
+	tunname, err := tundev.Name()
+	if err != nil {
+		return nil, err
 	}
-	return &r
+	return &darwinRouter{tunname: tunname}, nil
 }
 
 func (r *darwinRouter) Up() error {

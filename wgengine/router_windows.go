@@ -8,7 +8,6 @@ import (
 	"log"
 
 	winipcfg "github.com/tailscale/winipcfg-go"
-	"github.com/tailscale/wireguard-go/device"
 	"github.com/tailscale/wireguard-go/tun"
 	"tailscale.com/types/logger"
 )
@@ -16,26 +15,27 @@ import (
 type winRouter struct {
 	logf                func(fmt string, args ...interface{})
 	tunname             string
-	dev                 *device.Device
 	nativeTun           *tun.NativeTun
 	routeChangeCallback *winipcfg.RouteChangeCallback
 }
 
-func NewUserspaceRouter(logf logger.Logf, tunname string, dev *device.Device, tuntap tun.Device, netChanged func()) Router {
-	r := winRouter{
+func newUserspaceRouter(logf logger.Logf, tundev tun.Device, netChanged func()) (Router, error) {
+	tunname, err := tundev.Name()
+	if err != nil {
+		return nil, err
+	}
+	return &winRouter{
 		logf:      logf,
 		tunname:   tunname,
-		dev:       dev,
-		nativeTun: tuntap.(*tun.NativeTun),
-	}
-	return &r
+		nativeTun: tundev.(*tun.NativeTun),
+	}, nil
 }
 
 func (r *winRouter) Up() error {
 	// MonitorDefaultRoutes handles making sure our wireguard UDP
 	// traffic goes through the old route, not recursively through the VPN.
 	var err error
-	r.routeChangeCallback, err = MonitorDefaultRoutes(r.dev, true, r.nativeTun)
+	r.routeChangeCallback, err = MonitorDefaultRoutes(true, r.nativeTun)
 	if err != nil {
 		log.Fatalf("MonitorDefaultRoutes: %v\n", err)
 	}

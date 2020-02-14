@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tailscale/wireguard-go/device"
 	"github.com/tailscale/wireguard-go/tun"
 	"github.com/tailscale/wireguard-go/wgcfg"
 	"tailscale.com/atomicfile"
@@ -32,19 +31,24 @@ type linuxRouter struct {
 	routes     map[wgcfg.CIDR]struct{}
 }
 
-func NewUserspaceRouter(logf logger.Logf, tunname string, dev *device.Device, tuntap tun.Device, netChanged func()) Router {
+func newUserspaceRouter(logf logger.Logf, tunDev tun.Device, netChanged func()) (Router, error) {
+	// TODO: move monitor out of Router, make it created/owned by Engine
 	mon, err := monitor.New(logf, netChanged)
 	if err != nil {
-		log.Fatalf("rtnlmon.New() failed: %v", err)
+		return nil, err
 	}
 
-	r := linuxRouter{
+	tunname, err := tunDev.Name()
+	if err != nil {
+		return nil, err
+	}
+
+	return &linuxRouter{
 		logf:       logf,
 		tunname:    tunname,
 		mon:        mon,
 		netChanged: netChanged,
-	}
-	return &r
+	}, nil
 }
 
 func cmd(args ...string) *exec.Cmd {

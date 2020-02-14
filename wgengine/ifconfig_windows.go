@@ -18,7 +18,6 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 	winipcfg "github.com/tailscale/winipcfg-go"
-	"github.com/tailscale/wireguard-go/device"
 	"github.com/tailscale/wireguard-go/tun"
 	"github.com/tailscale/wireguard-go/wgcfg"
 	"golang.org/x/sys/windows"
@@ -37,7 +36,7 @@ func htonl(val uint32) uint32 {
 	return *(*uint32)(unsafe.Pointer(&bytes[0]))
 }
 
-func bindSocketRoute(family winipcfg.AddressFamily, device *device.Device, ourLuid uint64, lastLuid *uint64) error {
+func bindSocketRoute(family winipcfg.AddressFamily, ourLuid uint64, lastLuid *uint64) error {
 	routes, err := winipcfg.GetRoutes(family)
 	if err != nil {
 		return err
@@ -59,20 +58,21 @@ func bindSocketRoute(family winipcfg.AddressFamily, device *device.Device, ourLu
 		return nil
 	}
 	*lastLuid = luid
-	if false {
-		// TODO(apenwarr): doesn't work with magic socket yet.
+	// TODO(apenwarr): doesn't work with magic socket yet.
+	// TODO(bradfitz): restore wireguard/device.Device plumbing if we need this:
+	/*
 		if family == winipcfg.AF_INET {
 			return device.BindSocketToInterface4(index, false)
 		} else if family == winipcfg.AF_INET6 {
 			return device.BindSocketToInterface6(index, false)
 		}
-	} else {
-		log.Printf("WARNING: skipping windows socket binding.\n")
-	}
+	*/
+	_ = index
+	log.Printf("WARNING: skipping windows socket binding.\n")
 	return nil
 }
 
-func MonitorDefaultRoutes(device *device.Device, autoMTU bool, tun *tun.NativeTun) (*winipcfg.RouteChangeCallback, error) {
+func MonitorDefaultRoutes(autoMTU bool, tun *tun.NativeTun) (*winipcfg.RouteChangeCallback, error) {
 	guid := tun.GUID()
 	ourLuid, err := winipcfg.InterfaceGuidToLuid(&guid)
 	lastLuid4 := uint64(0)
@@ -82,11 +82,11 @@ func MonitorDefaultRoutes(device *device.Device, autoMTU bool, tun *tun.NativeTu
 		return nil, err
 	}
 	doIt := func() error {
-		err = bindSocketRoute(winipcfg.AF_INET, device, ourLuid, &lastLuid4)
+		err = bindSocketRoute(winipcfg.AF_INET, ourLuid, &lastLuid4)
 		if err != nil {
 			return err
 		}
-		err = bindSocketRoute(winipcfg.AF_INET6, device, ourLuid, &lastLuid6)
+		err = bindSocketRoute(winipcfg.AF_INET6, ourLuid, &lastLuid6)
 		if err != nil {
 			return err
 		}
